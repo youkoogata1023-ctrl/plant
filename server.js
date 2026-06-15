@@ -107,7 +107,7 @@ app.post("/api/dishes/import-text", wrap(async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "openrouter/auto",
+        model: "google/gemini-2.0-pro-exp-02-05:free",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: text }
