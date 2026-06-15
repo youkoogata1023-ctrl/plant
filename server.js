@@ -436,7 +436,13 @@ app.put("/api/state", wrap(async (req, res) => {
   const b = req.body;
   await pool.query(
     "UPDATE app_state SET settings=$1, current_dish_ids=$2, checked_items=$3, week_menu=$4, monthly_menu=$5 WHERE id=1",
-    [b.settings || {}, b.currentDishIds || [], b.checkedItems || [], b.weekMenu || [], b.monthlyMenu || {}]
+    [
+      JSON.stringify(b.settings || {}),
+      b.currentDishIds || [],
+      b.checkedItems || [],
+      JSON.stringify(b.weekMenu || []),
+      JSON.stringify(b.monthlyMenu || {})
+    ]
   );
   res.json({ ok: true });
 }));
