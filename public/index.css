@@ -1543,6 +1543,7 @@ input[type="text"]:focus, input[type="number"]:focus, select:focus {
   min-height: 120px;
   display: flex;
   flex-direction: column;
+  min-width: 0; /* 中の長いテキスト（料理名など）でセルが横に押し広げられるのを防ぐ */
 }
 .month-day-cell.other-month {
   opacity: 0.5;
