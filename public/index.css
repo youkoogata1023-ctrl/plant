@@ -1610,25 +1610,67 @@ input[type="text"]:focus, input[type="number"]:focus, select:focus {
   .hero-greeting { font-size: 1.3rem; }
   .hero-summary { gap: 0.6rem; }
   .hero-stat { font-size: 0.75rem; padding: 0.4rem 0.7rem; }
-  .week-grid { grid-template-columns: repeat(7, minmax(130px, 1fr)); }
+  
+  /* 週間献立プランナーのレスポンシブ最適化 (セルが拡大しすぎないようにコンパクトに) */
+  .week-grid { 
+    grid-template-columns: repeat(7, minmax(110px, 1fr)); 
+    gap: 0.5rem;
+  }
+  .day-column {
+    min-width: 110px;
+    padding: 0.5rem;
+    gap: 0.4rem;
+  }
+  .day-header {
+    font-size: 0.85rem;
+    padding-bottom: 0.4rem;
+  }
+  .meal-dropzone {
+    min-height: 75px;
+    padding: 0.3rem;
+  }
+  .meal-dropzone-title {
+    font-size: 0.7rem;
+    margin-bottom: 0.25rem;
+  }
+  .draggable-dish {
+    padding: 0.4rem;
+    font-size: 0.75rem;
+    border-radius: 6px;
+  }
+  .draggable-dish .planner-dish-actions {
+    margin-top: 0.4rem;
+    gap: 0.2rem;
+  }
+
   .meal-slot-today { flex-wrap: wrap; padding: 1rem; gap: 0.8rem; }
   .meal-image-placeholder { width: 60px; height: 60px; font-size: 1.5rem; }
   .meal-actions { width: 100%; justify-content: flex-end; }
   .advisor-container { flex-direction: column; align-items: center; text-align: center; }
   .speech-bubble::after, .speech-bubble::before { display: none; }
   .advisor-avatar-box { width: 70px; height: 70px; }
-  .dish-grid { grid-template-columns: 1fr; }
+  
+  /* 料理カタログ：タブレット/スマホで引き伸ばされすぎないよう複数列表示を維持 */
+  .dish-grid { 
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); 
+    gap: 1rem;
+  }
+  
   .week-summary-card { grid-template-columns: repeat(2, 1fr); }
   .catalog-filters { flex-direction: column; }
   .catalog-filters input { min-width: unset; width: 100%; }
+  
+  /* 月間カレンダー：セルが横に伸びすぎないように制限 */
   .month-calendar-grid { 
-    grid-template-columns: repeat(7, minmax(60px, 1fr)); 
+    grid-template-columns: repeat(7, minmax(50px, 1fr)); 
     overflow-x: auto; 
     padding-bottom: 1rem;
+    max-width: 680px;
+    margin: 1rem auto 0;
   }
-  .month-day-cell { min-height: 80px; padding: 0.2rem; }
-  .month-day-header { font-size: 0.7rem; margin-bottom: 0.2rem; }
-  .month-meal-item { font-size: 0.65rem; padding: 0.1rem; }
+  .month-day-cell { min-height: 70px; padding: 0.2rem; border-radius: 8px; }
+  .month-day-header { font-size: 0.7rem; margin-bottom: 0.15rem; }
+  .month-meal-item { font-size: 0.6rem; padding: 0.1rem; border-radius: 4px; gap: 0.1rem; }
   .month-meal-empty { display: none; }
 }
 
@@ -1637,4 +1679,9 @@ input[type="text"]:focus, input[type="number"]:focus, select:focus {
   .tab-link { padding: 0.3rem 0.5rem; font-size: 0.65rem; }
   .tab-link i { font-size: 1.2rem; }
   .hero-summary { flex-direction: column; }
+  
+  /* スマホ等の極小画面でのみカタログを1列にする */
+  .dish-grid { 
+    grid-template-columns: 1fr; 
+  }
 }
