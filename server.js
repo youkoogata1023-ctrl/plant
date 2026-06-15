@@ -116,15 +116,25 @@ app.post("/api/dishes/import-text", wrap(async (req, res) => {
     });
 
     if (!response.ok) {
-      throw new Error("OpenRouter API Error: " + response.statusText);
+      const errorText = await response.text();
+      throw new Error(`OpenRouter API Error (${response.status}): ${errorText}`);
     }
 
     const data = await response.json();
     let jsonStr = data.choices[0].message.content.trim();
-    // マークダウンの ```json が含まれている場合は除去
-    jsonStr = jsonStr.replace(/^```json\s*/, '').replace(/\s*```$/, '');
     
-    const parsed = JSON.parse(jsonStr);
+    // Markdownブロックの除去をより堅牢に
+    if (jsonStr.startsWith("```")) {
+      jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+    }
+    
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (e) {
+      console.error("Failed to parse JSON string:", jsonStr);
+      throw new Error("AIからの応答をJSONとして解析できませんでした: " + e.message);
+    }
 
     // デフォルト値の補完
     const newDish = {
