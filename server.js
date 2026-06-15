@@ -107,7 +107,7 @@ app.post("/api/dishes/import-text", wrap(async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-3.3-70b-instruct:free",
+        model: "openrouter/free",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: text }
