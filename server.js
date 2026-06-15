@@ -7,7 +7,6 @@ const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const vm = require("vm");
-const vm = require("vm");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const pool = require("./db/pool");
 const { seedDishes } = require("./db/seed");
