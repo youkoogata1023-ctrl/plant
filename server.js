@@ -7,8 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const vm = require("vm");
-const cheerio = require("cheerio");
-const puppeteer = require("puppeteer");
+const vm = require("vm");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const pool = require("./db/pool");
 const { seedDishes } = require("./db/seed");
@@ -75,93 +74,87 @@ const wrap = (fn) => (req, res) =>
    料理カタログ (CRUD)
    ============================================================ */
 
-app.post("/api/dishes/import-url", wrap(async (req, res) => {
-  const { url } = req.body;
-  if (!url) return res.status(400).json({ error: "URL is required" });
+app.post("/api/dishes/import-text", wrap(async (req, res) => {
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: "Text is required" });
 
-  // 1. fetch HTML using puppeteer
-  let html = "";
-  let browser = null;
+  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "sk-or-v1-dummy";
+
+  const systemPrompt = `あなたはプロの料理研究家兼データエンジニアです。
+ユーザーから提供されるテキストは、レシピサイトのページ内容をコピーしたものです。不要な情報（広告、メニュー、フッターなど）が含まれています。
+このテキストから料理レシピの情報を正確に抽出し、以下のJSONフォーマットのみを返してください。マークダウンのバッククォート(\`\`\`json)などは不要です。純粋なJSON文字列のみを出力してください。必ず日本語で出力してください。
+
+{
+  "name": "料理名",
+  "prepTime": 調理時間（分、数値のみ。不明なら15）,
+  "kcal": カロリー（数値のみ。不明なら0）,
+  "mainProtein": "主菜となる食材名（例：鶏肉、豚肉など。不明なら'その他'）",
+  "ingredients": ["材料名と分量（例：[A] しょうゆ 大さじ1、豚肉 200g）", ...],
+  "steps": ["作り方の手順1", "作り方の手順2", ...],
+  "cost": 推定費用（円、数値のみ。不明なら300）,
+  "season": ["spring", "summer", "autumn", "winter"]のいずれか1つ以上の配列,
+  "mealType": ["dinner", "lunch", "breakfast"]のいずれか1つ以上の配列
+}
+
+抽出の際の注意点：
+- 「A」などの調味料グループがある場合、材料名に「[A]」をプレフィックスとして付けてください。
+- steps（作り方）から、料理と無関係な「ボタンを押す」「探す」といったサイト特有の操作テキストは除外してください。`;
+
   try {
-    browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
-    const page = await browser.newPage();
-    // ページロードを待ち、.recipeName が表示されるまで待つ
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-    await page.waitForSelector('.recipeName', { timeout: 15000 });
-    html = await page.content();
-  } catch (err) {
-    console.error("Puppeteer error:", err);
-    return res.status(500).json({ error: "レシピ情報を読み取れませんでした。対応していないURLか、通信エラーの可能性があります。" });
-  } finally {
-    if (browser) await browser.close();
-  }
-
-  // 2. parse HTML
-  const $ = cheerio.load(html);
-  const name = $('.recipeName').text().trim();
-  if (!name) {
-    return res.status(400).json({ error: "Could not find recipe name in the URL" });
-  }
-
-  let prepTime = 15;
-  let kcal = 0;
-  $('.TimeKcalSaltList_item').each((i, el) => {
-    const text = $(el).text().trim();
-    if (text.includes('分')) {
-      const m = text.match(/(\d+)分/);
-      if (m) prepTime = parseInt(m[1], 10);
-    }
-    if (text.includes('kcal')) {
-      const m = text.match(/(\d+)kcal/);
-      if (m) kcal = parseInt(m[1], 10);
-    }
-  });
-
-  const ingredients = [];
-  $('.groupMaterialWrap').each((i, wrapEl) => {
-    const groupName = $(wrapEl).find('.groupName').text().replace(/\s+/g, ' ').trim();
-    const prefix = groupName ? `[${groupName}] ` : '';
-
-    $(wrapEl).find('.tableSeparatedByDottedLines').each((j, dlEl) => {
-      const dt = $(dlEl).find('dt').text().replace(/\s+/g, ' ').trim();
-      const dd = $(dlEl).find('dd').text().replace(/\s+/g, ' ').trim();
-      if (dt) {
-        ingredients.push(prefix + (dd ? dt + ' ' + dd : dt));
-      }
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "openrouter/auto",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: text }
+        ]
+      })
     });
-  });
 
-  const steps = [];
-  $('.OrederedList_text').each((i, el) => {
-    $(el).find('.recipeBox_C_A').remove();
-    const stepText = $(el).text().replace(/\s+/g, ' ').trim();
-    if (stepText) steps.push(stepText);
-  });
+    if (!response.ok) {
+      throw new Error("OpenRouter API Error: " + response.statusText);
+    }
 
-  // DB保存用のデータ構造
-  const newDish = {
-    name,
-    season: ['spring', 'summer', 'autumn', 'winter'],
-    mainProtein: ingredients.length > 0 ? ingredients[0].split(' ')[0].replace(/\[.*?\]\s*/, '') : 'その他',
-    prepTime,
-    kcal,
-    protein: 0,
-    carbs: 0,
-    fat: 0,
-    cost: 300,
-    ingredients,
-    steps,
-    mealType: ['dinner', 'lunch']
-  };
+    const data = await response.json();
+    let jsonStr = data.choices[0].message.content.trim();
+    // マークダウンの ```json が含まれている場合は除去
+    jsonStr = jsonStr.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    
+    const parsed = JSON.parse(jsonStr);
 
-  // 3. save to DB
-  const { rows } = await pool.query(
-    `INSERT INTO dishes (name, seasons, protein, carbs, fat, kcal, cost, main_protein, ingredients, steps, prep_time, meal_type)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-    dishParams(newDish)
-  );
+    // デフォルト値の補完
+    const newDish = {
+      name: parsed.name || '名称不明のレシピ',
+      season: parsed.season || ['spring', 'summer', 'autumn', 'winter'],
+      mainProtein: parsed.mainProtein || 'その他',
+      prepTime: parsed.prepTime || 15,
+      kcal: parsed.kcal || 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      cost: parsed.cost || 300,
+      ingredients: parsed.ingredients || [],
+      steps: parsed.steps || [],
+      mealType: parsed.mealType || ['dinner', 'lunch']
+    };
 
-  res.status(201).json(dishOut(rows[0]));
+    // 3. save to DB
+    const { rows } = await pool.query(
+      `INSERT INTO dishes (name, seasons, protein, carbs, fat, kcal, cost, main_protein, ingredients, steps, prep_time, meal_type)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      dishParams(newDish)
+    );
+
+    res.status(201).json(dishOut(rows[0]));
+  } catch (err) {
+    console.error("AI Import error:", err);
+    res.status(500).json({ error: "AIでの抽出に失敗しました: " + err.message });
+  }
 }));
 
 app.get("/api/dishes", wrap(async (req, res) => {

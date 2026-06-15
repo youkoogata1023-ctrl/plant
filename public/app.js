@@ -1526,40 +1526,41 @@ async function deleteTemplate(id) {
 }
 
 /* ============================================================
-   URLからレシピインポート
+/* ============================================================
+   AIテキストインポート
    ============================================================ */
-function openImportUrlModal() {
-  document.getElementById("import-url-input").value = "";
-  document.getElementById("import-url-modal").style.display = "block";
+function openImportTextModal() {
+  document.getElementById("import-text-input").value = "";
+  document.getElementById("import-text-modal").style.display = "block";
 }
-function closeImportUrlModal() {
-  document.getElementById("import-url-modal").style.display = "none";
+function closeImportTextModal() {
+  document.getElementById("import-text-modal").style.display = "none";
 }
-async function importRecipeFromUrl() {
-  const url = document.getElementById("import-url-input").value.trim();
-  if (!url) return alert("URLを入力してください。");
+async function importRecipeFromText() {
+  const text = document.getElementById("import-text-input").value.trim();
+  if (!text) return alert("テキストを貼り付けてください。");
 
-  const btn = document.getElementById("btn-import-url");
+  const btn = document.getElementById("btn-import-text");
   btn.disabled = true;
-  btn.innerHTML = `<i class="ph ph-spinner ph-spin"></i> 取り込み中...`;
+  btn.innerHTML = `<i class="ph ph-spinner ph-spin"></i> 解析中...`;
 
   try {
-    const res = await fetch("/api/dishes/import-url", {
+    const res = await fetch("/api/dishes/import-text", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url })
+      body: JSON.stringify({ text })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "インポートに失敗しました");
 
-    showToast("URLからレシピをインポートしました！", "success");
-    closeImportUrlModal();
+    showToast("テキストからレシピをインポートしました！", "success");
+    closeImportTextModal();
     fetchDishes();
   } catch (err) {
     alert(err.message);
   } finally {
     btn.disabled = false;
-    btn.innerHTML = `<i class="ph ph-download"></i> 取り込む`;
+    btn.innerHTML = `<i class="ph ph-magic-wand"></i> AIで抽出する`;
   }
 }
 
