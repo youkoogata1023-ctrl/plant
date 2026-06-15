@@ -8,6 +8,7 @@ const path = require("path");
 const express = require("express");
 const vm = require("vm");
 const cheerio = require("cheerio");
+const puppeteer = require("puppeteer");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const pool = require("./db/pool");
 const { seedDishes } = require("./db/seed");
@@ -78,12 +79,22 @@ app.post("/api/dishes/import-url", wrap(async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: "URL is required" });
 
-  // 1. fetch HTML
-  const response = await fetch(url);
-  if (!response.ok) {
-    return res.status(500).json({ error: "Failed to fetch URL" });
+  // 1. fetch HTML using puppeteer
+  let html = "";
+  let browser = null;
+  try {
+    browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+    const page = await browser.newPage();
+    // ページロードを待ち、.recipeName が表示されるまで待つ
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+    await page.waitForSelector('.recipeName', { timeout: 15000 });
+    html = await page.content();
+  } catch (err) {
+    console.error("Puppeteer error:", err);
+    return res.status(500).json({ error: "レシピ情報を読み取れませんでした。対応していないURLか、通信エラーの可能性があります。" });
+  } finally {
+    if (browser) await browser.close();
   }
-  const html = await response.text();
 
   // 2. parse HTML
   const $ = cheerio.load(html);
