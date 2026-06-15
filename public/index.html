@@ -277,6 +277,9 @@
       <header class="section-header">
         <h2><i class="ph ph-book-open"></i> 料理カタログ</h2>
         <div class="actions">
+          <button class="btn btn-outline" onclick="openImportUrlModal()">
+            <i class="ph ph-link"></i> URLからインポート
+          </button>
           <button class="btn btn-primary" onclick="openGenerateRecipeModal()">
             <i class="ph ph-magic-wand"></i> AIでレシピ考案
           </button>
@@ -385,6 +388,33 @@
   </div>
 
   <!-- 手動料理登録モーダル -->
+  <!-- URLインポートモーダル (ボトムシート風) -->
+  <div id="import-url-modal" class="modal">
+    <div class="modal-content bottom-sheet">
+      <div class="modal-header">
+        <h2>URLからレシピをインポート</h2>
+        <button class="btn-icon" onclick="closeImportUrlModal()">
+          <i class="ph ph-x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="hint" style="margin-bottom:1rem;">
+          SHARP COCORO KITCHEN などのレシピURLを貼り付けると、自動で料理名・材料・手順を取り込みます。
+        </p>
+        <div class="form-group">
+          <label>レシピのURL</label>
+          <input type="url" id="import-url-input" placeholder="https://cocoroplus.jp.sharp/kitchen/recipe/..." />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeImportUrlModal()">キャンセル</button>
+        <button class="btn btn-primary" id="btn-import-url" onclick="importRecipeFromUrl()">
+          <i class="ph ph-download"></i> 取り込む
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div id="dish-modal" class="modal">
     <div class="modal-content">
       <span class="close" onclick="closeDishModal()">&times;</span>

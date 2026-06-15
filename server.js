@@ -7,6 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const vm = require("vm");
+const cheerio = require("cheerio");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const pool = require("./db/pool");
 const { seedDishes } = require("./db/seed");
@@ -72,6 +73,86 @@ const wrap = (fn) => (req, res) =>
 /* ============================================================
    料理カタログ (CRUD)
    ============================================================ */
+
+app.post("/api/dishes/import-url", wrap(async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: "URL is required" });
+
+  // 1. fetch HTML
+  const response = await fetch(url);
+  if (!response.ok) {
+    return res.status(500).json({ error: "Failed to fetch URL" });
+  }
+  const html = await response.text();
+
+  // 2. parse HTML
+  const $ = cheerio.load(html);
+  const name = $('.recipeName').text().trim();
+  if (!name) {
+    return res.status(400).json({ error: "Could not find recipe name in the URL" });
+  }
+
+  let prepTime = 15;
+  let kcal = 0;
+  $('.TimeKcalSaltList_item').each((i, el) => {
+    const text = $(el).text().trim();
+    if (text.includes('分')) {
+      const m = text.match(/(\d+)分/);
+      if (m) prepTime = parseInt(m[1], 10);
+    }
+    if (text.includes('kcal')) {
+      const m = text.match(/(\d+)kcal/);
+      if (m) kcal = parseInt(m[1], 10);
+    }
+  });
+
+  const ingredients = [];
+  $('.groupMaterialWrap').each((i, wrapEl) => {
+    const groupName = $(wrapEl).find('.groupName').text().replace(/\s+/g, ' ').trim();
+    const prefix = groupName ? `[${groupName}] ` : '';
+
+    $(wrapEl).find('.tableSeparatedByDottedLines').each((j, dlEl) => {
+      const dt = $(dlEl).find('dt').text().replace(/\s+/g, ' ').trim();
+      const dd = $(dlEl).find('dd').text().replace(/\s+/g, ' ').trim();
+      if (dt) {
+        ingredients.push(prefix + (dd ? dt + ' ' + dd : dt));
+      }
+    });
+  });
+
+  const steps = [];
+  $('.OrederedList_text').each((i, el) => {
+    $(el).find('.recipeBox_C_A').remove();
+    const stepText = $(el).text().replace(/\s+/g, ' ').trim();
+    if (stepText) steps.push(stepText);
+  });
+
+  // DB保存用のデータ構造
+  const newDish = {
+    name,
+    season: ['spring', 'summer', 'autumn', 'winter'],
+    mainProtein: ingredients.length > 0 ? ingredients[0].split(' ')[0].replace(/\[.*?\]\s*/, '') : 'その他',
+    prepTime,
+    kcal,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+    cost: 300,
+    ingredients,
+    steps,
+    mealType: ['dinner', 'lunch']
+  };
+
+  // 3. save to DB
+  const { rows } = await pool.query(
+    `INSERT INTO dishes (name, seasons, protein, carbs, fat, kcal, cost, main_protein, ingredients, steps, prep_time, meal_type)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    dishParams(newDish)
+  );
+
+  res.status(201).json(dishOut(rows[0]));
+}));
+
 app.get("/api/dishes", wrap(async (req, res) => {
   const { season } = req.query;
   let q = "SELECT * FROM dishes";

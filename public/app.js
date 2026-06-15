@@ -1525,6 +1525,44 @@ async function deleteTemplate(id) {
   showToast('テンプレートを削除しました', 'info');
 }
 
+/* ============================================================
+   URLからレシピインポート
+   ============================================================ */
+function openImportUrlModal() {
+  document.getElementById("import-url-input").value = "";
+  document.getElementById("import-url-modal").style.display = "block";
+}
+function closeImportUrlModal() {
+  document.getElementById("import-url-modal").style.display = "none";
+}
+async function importRecipeFromUrl() {
+  const url = document.getElementById("import-url-input").value.trim();
+  if (!url) return alert("URLを入力してください。");
+
+  const btn = document.getElementById("btn-import-url");
+  btn.disabled = true;
+  btn.innerHTML = `<i class="ph ph-spinner ph-spin"></i> 取り込み中...`;
+
+  try {
+    const res = await fetch("/api/dishes/import-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "インポートに失敗しました");
+
+    showToast("URLからレシピをインポートしました！", "success");
+    closeImportUrlModal();
+    fetchDishes();
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<i class="ph ph-download"></i> 取り込む`;
+  }
+}
+
 /* ============ Manual Dish Registration ============ */
 function openDishModal() {
   document.getElementById("dish-form").reset();
