@@ -1,0 +1,59 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ja" xml:lang="ja">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=shift_jis" />
+<meta http-equiv="content-style-type" content="text/css" />
+<meta http-equiv="content-script-type" content="text/javascript" />
+<meta http-equiv="content-language" content="ja" />
+<title>âfâWâ^âïâ`âëâV</title>
+<script type="text/javascript" src="frame/js/jquery.js"></script>
+<script type="text/javascript" src="frame/js/swfobject.js"></script>
+<script type="text/javascript" src="frame/js/run.js"></script>
+
+<link rel="stylesheet" href="/site/chirashi_viewer_js/css/viewer.css" type="text/css" media="screen, print" />
+<script type="text/javascript" src="/log/asp.js"></script>
+<script type="text/javascript" src="/site/201009/js/jquery.cookie.js"></script>
+
+<script type="text/javascript" src="/site/chirashi_viewer_js/js/jquery.exresize-latest.js"></script>
+<script type="text/javascript" src="/site/chirashi_viewer_js/js/asp_chirashiView.js" charset="shift_jis"></script>
+<script type="text/javascript" src="/site/chirashi_viewer_js/js/asp_recommend.js"></script>
+
+
+
+<script type="text/javascript">
+$(document).ready(function(){
+	resize();
+	run();
+});
+</script>
+<style type="text/css">
+html {
+	overflow:hidden;
+	margin:0;
+	padding:0;
+	height:100%;
+}
+body {
+	margin:0;
+	padding:0;
+	height:100%;
+}
+object,embed {
+	overflow:auto;
+	outline:none;
+}
+#chirashi_area {
+	width:100%;
+	height:100%;
+}
+</style>
+</head>
+
+<body>
+<div id="chirashi_area">
+	<div id="libook">
+	<noscript><img src="/common/201009/images/nojs.gif" alt="üªJavaScripté╠É▌ÆΦé≡ùLî°é╔é╡é─é▓ùùé¡é╛é│éóüB" width="438" height="43" border="0" usemap="#Map" /></noscript>
+    </div>
+</div>
+</body>
+</html>

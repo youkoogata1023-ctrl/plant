@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="旬献立 - AIキャラクターと一緒に1週間の献立を計画し、買い物リストを自動生成する献立管理アプリ">
+  <title>旬献立 (Shun Kondate)</title>
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Three.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="stylesheet" href="/index.css?v=3" />
+</head>
+<body>
+  <!-- Theme Toggle -->
+  <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="テーマ切替">
+    <i class="ph ph-moon"></i>
+  </button>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav">
+    <a href="#" class="tab-link active" onclick="showTab('today')">
+      <i class="ph ph-sun"></i>
+      <span>今日</span>
+    </a>
+    <a href="#" class="tab-link" onclick="showTab('week')">
+      <i class="ph ph-calendar-blank"></i>
+      <span>献立</span>
+    </a>
+    <a href="#" class="tab-link" onclick="showTab('month')">
+      <i class="ph ph-calendar-dots"></i>
+      <span>月間</span>
+    </a>
+    <a href="#" class="tab-link" onclick="showTab('shopping')">
+      <i class="ph ph-shopping-cart"></i>
+      <span>買い物</span>
+    </a>
+    <a href="#" class="tab-link" onclick="showTab('catalog')">
+      <i class="ph ph-book-open"></i>
+      <span>料理</span>
+    </a>
+  </nav>
+
+  <main id="app-content">
+
+    <!-- ========== 今日 タブ ========== -->
+    <section id="tab-today" class="tab-pane active">
+      <!-- Hero Card -->
+      <div class="hero-card" id="hero-card">
+        <div class="hero-greeting" id="hero-greeting">こんにちは！</div>
+        <div class="hero-date" id="hero-date"></div>
+        <div class="hero-summary" id="hero-summary">
+          <!-- JSで描画 -->
+        </div>
+      </div>
+
+      <!-- 季節おすすめバナー -->
+      <div class="season-banner" id="season-banner">
+        <!-- JSで描画 -->
+      </div>
+
+      <!-- ひまりのアドバイスボード -->
+      <div class="advisor-container" id="today-advisor-container">
+        <div class="advisor-avatar-box" id="himari-3d-container">
+          <!-- 3D Canvas will be injected here -->
+        </div>
+        <div class="advisor-info">
+          <div class="advisor-name">ひまり <span>AI管理栄養士</span></div>
+          <div class="speech-bubble" id="today-advisor-speech">
+            今日の献立を立ててみましょう！PFCバランスを分析して健康アドバイスをします。
+          </div>
+        </div>
+      </div>
+
+      <!-- 1日の総合PFCプログレスバー -->
+      <div class="daily-progress-container" id="daily-progress">
+        <!-- JSで描画 -->
+      </div>
+
+      <!-- 3食リスト -->
+      <div id="today-meals-container">
+        <!-- JSで描画 -->
+      </div>
+    </section>
+
+    <!-- ========== 献立（月間）タブ ========== -->
+    <section id="tab-month" class="tab-pane">
+      <header class="section-header" style="justify-content: center;">
+        <button class="btn btn-outline btn-sm" onclick="changeMonth(-1)"><i class="ph ph-caret-left"></i></button>
+        <h2 id="month-calendar-title" style="margin: 0 1rem; font-size: 1.3rem;">2026年6月</h2>
+        <button class="btn btn-outline btn-sm" onclick="changeMonth(1)"><i class="ph ph-caret-right"></i></button>
+      </header>
+      <div id="month-calendar-grid" class="month-calendar-grid">
+        <!-- JSで描画 -->
+      </div>
+    </section>
+
+    <!-- ========== 献立（1週間）タブ ========== -->
+    <section id="tab-week" class="tab-pane">
+      <header class="section-header" style="align-items: center; justify-content: space-between;">
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <button class="btn btn-outline btn-sm" onclick="changeWeek(-1)"><i class="ph ph-caret-left"></i></button>
+          <h2 style="margin: 0; font-size: 1.2rem;"><i class="ph ph-calendar-blank"></i> 献立プランナー</h2>
+          <button class="btn btn-outline btn-sm" onclick="changeWeek(1)"><i class="ph ph-caret-right"></i></button>
+        </div>
+        <div class="actions" style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+          <div class="servings-container" style="display:flex; align-items:center; gap:0.3rem;">
+            <i class="ph ph-users" style="color:var(--primary-color); font-size:1.2rem;"></i>
+            <select id="servings-input-week" onchange="changeServings(this.value)" style="padding:0.4rem 0.6rem; border-radius:10px;">
+              <option value="1">1人分</option>
+              <option value="2" selected>2人分</option>
+              <option value="3">3人分</option>
+              <option value="4">4人分</option>
+              <option value="5">5人分</option>
+              <option value="6">6人分</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="generateFromSavedDishes()">
+            <i class="ph ph-list-plus"></i> 保存レシピから自動作成
+          </button>
+          <button class="btn btn-outline" onclick="openGenerateAiModal()">
+            <i class="ph ph-magic-wand"></i> AI提案で作成
+          </button>
+          <button class="btn btn-outline" onclick="openTemplateModal()">
+            <i class="ph ph-floppy-disk"></i> テンプレート
+          </button>
+        </div>
+      </header>
+
+      <!-- ステータスバー -->
+      <div class="planner-status-bar" id="planner-status-bar">
+        <span class="status-text">献立充足率</span>
+        <div class="status-bar-bg">
+          <div class="status-bar-fill" id="planner-status-fill" style="width:0%"></div>
+        </div>
+        <span class="status-count" id="planner-status-count">0/21</span>
+      </div>
+
+      <!-- 週間サマリー -->
+      <div class="week-summary-card" id="week-summary-card">
+        <!-- JSで描画 -->
+      </div>
+
+      <div class="week-grid" id="week-grid">
+        <!-- JSで曜日×3食のグリッドを生成 -->
+      </div>
+      
+      <!-- プランナー用ミニカタログ -->
+      <div class="mini-catalog-section">
+        <h3 style="margin-bottom:0.5rem;"><i class="ph ph-list-plus"></i> カタログからドラッグして追加</h3>
+        <div class="mini-catalog-filters">
+           <input type="text" id="mini-catalog-search" placeholder="料理名で絞り込み..." oninput="debouncedRenderMiniCatalog()" />
+        </div>
+        <div class="mini-catalog-list" id="mini-catalog-list">
+           <!-- JSで生成 -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 買い物 タブ ========== -->
+    <section id="tab-shopping" class="tab-pane">
+      <header class="section-header">
+        <h2><i class="ph ph-shopping-cart"></i> 買い物リスト</h2>
+        <div class="actions">
+          <button class="btn btn-outline" onclick="copyShoppingList()">
+            <i class="ph ph-copy"></i> コピー
+          </button>
+          <button class="btn btn-outline" onclick="window.print()">
+            <i class="ph ph-printer"></i> 印刷
+          </button>
+          <button class="btn btn-primary" onclick="getShoppingAdvice()">
+            <i class="ph ph-sparkle"></i> 買い物アドバイス
+          </button>
+        </div>
+      </header>
+
+      <!-- ひまりの買い物アドバイスボード -->
+      <div class="advisor-container" id="shopping-advisor-container" style="margin-bottom: 1.5rem;">
+        <div class="advisor-avatar-box" id="himari-shopping-3d-container">
+          <!-- 3D Canvas will be injected here -->
+        </div>
+        <div class="advisor-info">
+          <div class="advisor-name">ひまり <span>AI管理栄養士</span></div>
+          <div class="speech-bubble" id="shopping-advisor-speech">
+            献立を作成したら「買い物アドバイス」ボタンを押してね。食材の賢い保存法や節約術を教えるよ！
+          </div>
+        </div>
+      </div>
+
+      <!-- 買い物設定パネル（人数・曜日選択） -->
+      <div class="shopping-settings-panel" style="margin-bottom: 1.5rem;">
+        <div class="shopping-settings-row" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+          <div class="servings-container" style="display:flex; align-items:center; gap:0.4rem;">
+            <i class="ph ph-users" style="color:var(--primary-color); font-size:1.3rem;"></i>
+            <span style="font-weight:700; font-size:0.9rem;">人数：</span>
+            <select id="servings-input-shopping" onchange="changeServings(this.value)" style="padding:0.4rem 0.6rem; border-radius:10px;">
+              <option value="1">1人分</option>
+              <option value="2" selected>2人分</option>
+              <option value="3">3人分</option>
+              <option value="4">4人分</option>
+              <option value="5">5人分</option>
+              <option value="6">6人分</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="shopping-settings-row" style="margin-top: 1rem; border-top: 1px dashed var(--border-color); padding-top: 1rem;">
+          <div style="font-weight:700; font-size:0.9rem; margin-bottom:0.6rem; display:flex; align-items:center; gap:0.3rem;">
+            <i class="ph ph-calendar-blank" style="color:var(--primary-color); font-size:1.2rem;"></i>
+            集計する曜日（選択した範囲のみ集計）：
+          </div>
+          <div class="day-toggle-group" id="shopping-day-toggles" style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+            <button class="day-toggle-btn active" id="day-btn-0" onclick="toggleShoppingDay(0)">日</button>
+            <button class="day-toggle-btn active" id="day-btn-1" onclick="toggleShoppingDay(1)">月</button>
+            <button class="day-toggle-btn active" id="day-btn-2" onclick="toggleShoppingDay(2)">火</button>
+            <button class="day-toggle-btn active" id="day-btn-3" onclick="toggleShoppingDay(3)">水</button>
+            <button class="day-toggle-btn active" id="day-btn-4" onclick="toggleShoppingDay(4)">木</button>
+            <button class="day-toggle-btn active" id="day-btn-5" onclick="toggleShoppingDay(5)">金</button>
+            <button class="day-toggle-btn active" id="day-btn-6" onclick="toggleShoppingDay(6)">土</button>
+          </div>
+          <div class="preset-buttons-group" style="margin-top: 0.75rem; display:flex; gap:0.4rem; flex-wrap:wrap;">
+            <button class="btn btn-outline btn-xs" onclick="setShoppingPreset('first3')" style="padding:0.25rem 0.5rem; font-size:0.75rem;">前半3日 (日〜火)</button>
+            <button class="btn btn-outline btn-xs" onclick="setShoppingPreset('last3')" style="padding:0.25rem 0.5rem; font-size:0.75rem;">後半3日 (水〜金)</button>
+            <button class="btn btn-outline btn-xs" onclick="setShoppingPreset('all')" style="padding:0.25rem 0.5rem; font-size:0.75rem;">全日程 (1週間)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 今日の特売情報（チラシ連携） -->
+      <div class="deals-dashboard" id="deals-dashboard" style="margin-bottom: 1.5rem; background: var(--card-bg); backdrop-filter: blur(10px); border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 1.25rem; box-shadow: var(--shadow-sm);">
+        <header class="section-header" style="margin-bottom: 1rem; border-left: none; padding-left: 0;">
+          <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 0.4rem;">
+            <i class="ph ph-tag" style="color:var(--danger-color)"></i> 近隣スーパーの特売情報
+          </h3>
+          <button class="btn btn-outline btn-sm" onclick="fetchDeals()">
+            <i class="ph ph-arrows-clockwise"></i> 更新
+          </button>
+        </header>
+        <div id="deals-list" style="display:flex; gap:0.6rem; overflow-x:auto; padding-bottom:0.5rem;">
+           <div style="color:var(--text-light); font-size:0.85rem;">取得中...</div>
+        </div>
+        <button class="btn btn-primary" onclick="openDealsAiMenuModal()" style="width: 100%; margin-top: 0.8rem; background: linear-gradient(135deg, #DD6B20, #E53E3E);">
+          <i class="ph ph-magic-wand"></i> 特売品を使ってAI献立を作成
+        </button>
+      </div>
+
+      <div class="shopping-content-wrapper">
+        <div id="shopping-list" class="shopping-list">
+          <div class="empty-state">
+            <div class="empty-state-icon"><i class="ph ph-shopping-cart"></i></div>
+            <div class="empty-state-title">買い物リストがありません</div>
+            <p>献立を作成すると、必要な食材がここに集計されます。</p>
+          </div>
+        </div>
+        <div class="supermarket-section">
+          <header class="section-header" style="margin-top:0;">
+            <h2><i class="ph ph-storefront"></i> 近くのスーパー</h2>
+            <button class="btn btn-outline" onclick="findSupermarkets()">
+              <i class="ph ph-map-pin"></i> 現在地周辺を探す
+            </button>
+          </header>
+          <p class="hint">現在地 (GPS) から周辺2kmの実店舗を検索します。</p>
+          <div id="supermarkets-list" class="supermarkets-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 料理カタログ タブ ========== -->
+    <section id="tab-catalog" class="tab-pane">
+      <header class="section-header">
+        <h2><i class="ph ph-book-open"></i> 料理カタログ</h2>
+        <div class="actions">
+          <button class="btn btn-primary" onclick="openGenerateRecipeModal()">
+            <i class="ph ph-magic-wand"></i> AIでレシピ考案
+          </button>
+          <button class="btn btn-outline" onclick="openDishModal()">
+            <i class="ph ph-plus"></i> 新規登録
+          </button>
+        </div>
+      </header>
+
+      <!-- カテゴリタブ -->
+      <div class="catalog-tabs" id="catalog-tabs">
+        <button class="catalog-tab active" data-filter="all" onclick="setCatalogFilter('all')">すべて</button>
+        <button class="catalog-tab" data-filter="favorite" onclick="setCatalogFilter('favorite')">⭐ お気に入り</button>
+        <button class="catalog-tab" data-filter="breakfast" onclick="setCatalogFilter('breakfast')">☀ 朝食向き</button>
+        <button class="catalog-tab" data-filter="lunch" onclick="setCatalogFilter('lunch')">🍱 昼食向き</button>
+        <button class="catalog-tab" data-filter="dinner" onclick="setCatalogFilter('dinner')">🌙 夕食向き</button>
+      </div>
+
+      <div class="catalog-filters">
+        <input type="text" id="catalog-search" placeholder="料理名や食材で検索..." oninput="debouncedRenderCatalog()" />
+        <select id="catalog-season" onchange="renderCatalog()">
+          <option value="">すべての季節</option>
+          <option value="spring">春</option>
+          <option value="summer">夏</option>
+          <option value="autumn">秋</option>
+          <option value="winter">冬</option>
+        </select>
+      </div>
+
+      <div class="catalog-count" id="catalog-count"></div>
+      <div class="dish-grid" id="dish-grid"></div>
+    </section>
+  </main>
+
+  <!-- AI献立作成モーダル -->
+  <div id="ai-modal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeAiModal()">&times;</span>
+      <h3><i class="ph ph-magic-wand"></i> AI 献立作成</h3>
+      <p>ご希望のテーマや条件を入力してください。</p>
+      <input type="text" id="ai-query" placeholder="例: 安くてヘルシーな和食中心" />
+      <button class="btn btn-primary" onclick="generateAiMenu()" id="ai-btn">作成する</button>
+      <div id="ai-loading" class="hidden" style="margin-top:1rem; color:var(--text-light); text-align:center;">
+        <i class="ph ph-spinner ph-spin" style="font-size:2rem; margin-bottom:0.5rem;"></i>
+        <p>1週間分（21食分）の献立を考案中です... (5〜10秒ほどかかります)</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- AIレシピ考案モーダル -->
+  <div id="ai-recipe-modal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeAiRecipeModal()">&times;</span>
+      <h3><i class="ph ph-magic-wand"></i> AI レシピ考案</h3>
+      
+      <!-- たくみの案内スペース -->
+      <div class="advisor-container" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, rgba(254, 243, 199, 0.85) 0%, rgba(253, 230, 138, 0.85) 100%); border-color: rgba(251, 191, 36, 0.4);">
+        <div class="advisor-avatar-box" id="takumi-3d-container" style="border-color: #FBBF24;">
+          <!-- 3D Canvas will be injected here -->
+        </div>
+        <div class="advisor-info">
+          <div class="advisor-name" style="color: #D97706;">たくみ <span>AIシェフ</span></div>
+          <div class="speech-bubble" id="ai-recipe-speech" style="border-color: rgba(251, 191, 36, 0.2);">
+            こんにちは！冷蔵庫の余り物や、今食べたい気分の食材を入力してね。僕が新しいオリジナルレシピを考案するよ！
+          </div>
+        </div>
+      </div>
+
+      <input type="text" id="ai-recipe-query" placeholder="例: 大根と豚肉で辛いもの" />
+      <button class="btn btn-primary" onclick="generateAiRecipe()" id="ai-recipe-btn" style="width:100%; justify-content:center;">考案する</button>
+      <div id="ai-recipe-loading" class="hidden" style="margin-top:1rem; color:var(--text-light); text-align:center;">
+        <i class="ph ph-spinner ph-spin" style="font-size:2rem; margin-bottom:0.5rem; color:var(--primary-color)"></i>
+        <p>レシピを考案中です...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- レシピ詳細表示モーダル -->
+  <div id="recipe-modal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeRecipeModal()">&times;</span>
+      <h3 id="recipe-modal-title" style="margin-bottom:1rem;"></h3>
+      <div id="recipe-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- プランナー追加用モーダル -->
+  <div id="add-to-plan-modal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+      <span class="close" onclick="closeAddToPlanModal()">&times;</span>
+      <h3>献立に追加</h3>
+      <p id="add-to-plan-dish-name" style="font-weight:bold; margin-bottom:1rem;"></p>
+      
+      <label>日付を選ぶ</label>
+      <input type="date" id="add-to-plan-day" style="width:100%; margin-bottom:1rem; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 8px;">
+
+      <label>時間帯を選ぶ</label>
+      <select id="add-to-plan-meal" style="width:100%; margin-bottom:1.5rem;">
+        <option value="breakfast">朝食</option>
+        <option value="lunch">昼食</option>
+        <option value="dinner">夕食</option>
+      </select>
+      
+      <button class="btn btn-primary" style="width:100%;" onclick="confirmAddToPlan()">追加する</button>
+    </div>
+  </div>
+
+  <!-- 手動料理登録モーダル -->
+  <div id="dish-modal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeDishModal()">&times;</span>
+      <h3 id="dish-modal-title">料理を登録</h3>
+      <form id="dish-form" onsubmit="saveDish(event)">
+        <input type="hidden" id="dish-id" />
+        <label>料理名 <input type="text" id="dish-name" required /></label>
+        
+        <div class="form-row">
+          <label>メイン食材 <input type="text" id="dish-main-protein" /></label>
+          <label>調理時間(分) <input type="number" id="dish-prep-time" value="15" /></label>
+        </div>
+
+        <div class="form-row">
+          <label>カロリー(kcal) <input type="number" id="dish-kcal" /></label>
+          <label>費用(円) <input type="number" id="dish-cost" /></label>
+        </div>
+
+        <div class="form-row">
+          <label>P(タンパク質) <input type="number" id="dish-protein" step="0.1" /></label>
+          <label>F(脂質) <input type="number" id="dish-fat" step="0.1" /></label>
+          <label>C(炭水化物) <input type="number" id="dish-carbs" step="0.1" /></label>
+        </div>
+
+        <label>材料 (カンマ区切り) <input type="text" id="dish-ingredients" /></label>
+        <label>作り方 (カンマ区切り) <input type="text" id="dish-steps" /></label>
+        
+        <label>食事タイプ
+          <div class="checkbox-group">
+            <label><input type="checkbox" name="dish-mealtype" value="breakfast"> 朝食</label>
+            <label><input type="checkbox" name="dish-mealtype" value="lunch"> 昼食</label>
+            <label><input type="checkbox" name="dish-mealtype" value="dinner"> 夕食</label>
+          </div>
+        </label>
+
+        <label>季節
+          <div class="checkbox-group">
+            <label><input type="checkbox" name="dish-season" value="spring"> 春</label>
+            <label><input type="checkbox" name="dish-season" value="summer"> 夏</label>
+            <label><input type="checkbox" name="dish-season" value="autumn"> 秋</label>
+            <label><input type="checkbox" name="dish-season" value="winter"> 冬</label>
+          </div>
+        </label>
+        
+        <button type="submit" class="btn btn-primary" style="margin-top:1rem; width:100%;">保存</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- クイック入れ替えモーダル -->
+  <div id="quick-swap-modal" class="modal">
+    <div class="modal-content" style="max-width: 450px;">
+      <span class="close" onclick="closeQuickSwapModal()">&times;</span>
+      <h3>料理を入れ替え</h3>
+      <p id="quick-swap-modal-title" style="color:var(--text-light); margin-bottom:1rem; font-size:0.9rem;"></p>
+      <div class="quick-swap-list" id="quick-swap-list">
+        <!-- JSで生成 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- テンプレート管理モーダル -->
+  <div id="template-modal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+      <span class="close" onclick="closeTemplateModal()">&times;</span>
+      <h3><i class="ph ph-floppy-disk"></i> 献立テンプレート</h3>
+      <p style="color:var(--text-light); margin-bottom:1rem; font-size:0.9rem;">現在の献立をテンプレートとして保存したり、過去のテンプレートから復元できます。</p>
+      
+      <div style="display:flex; gap:0.5rem; margin-bottom:1.5rem;">
+        <input type="text" id="template-name" placeholder="テンプレート名（例: ヘルシー週間）" style="flex-grow:1;" />
+        <button class="btn btn-primary" onclick="saveTemplate()">
+          <i class="ph ph-floppy-disk"></i> 保存
+        </button>
+      </div>
+
+      <h4 style="margin-bottom:0.8rem; font-size:1rem;">保存済みテンプレート</h4>
+      <div class="template-list" id="template-list">
+        <div class="empty-state" style="padding:1.5rem;">
+          <p>保存済みのテンプレートはありません。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- チラシ拡大モーダル -->
+  <div id="flyer-image-modal" class="modal" onclick="closeFlyerImageModal()">
+    <div class="modal-content" style="max-width: 90vw; background: transparent; padding: 0; display: flex; justify-content: center; align-items: center; border: none; box-shadow: none;" onclick="event.stopPropagation()">
+      <div style="position: relative; display: inline-block;">
+        <span class="close" onclick="closeFlyerImageModal()" style="position: absolute; top: -30px; right: -30px; color: white; font-size: 2rem; background: rgba(0,0,0,0.5); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10;">&times;</span>
+        <img id="flyer-image-modal-img" src="" style="max-width: 90vw; max-height: 85vh; border-radius: 8px; object-fit: contain; background: white;" />
+      </div>
+    </div>
+  </div>
+
+  <script src="/3d-characters.js?v=6"></script>
+  <script src="/app.js?v=9"></script>
+</body>
+</html>

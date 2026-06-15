@@ -1,0 +1,23 @@
+# Render Blueprint — このリポジトリを Render に接続すると
+# Web サービス + PostgreSQL が自動作成される。
+databases:
+  - name: shun-kondate-db
+    databaseName: shun_kondate
+    user: shun_kondate
+    plan: free
+
+services:
+  - type: web
+    name: shun-kondate
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: shun-kondate-db
+          property: connectionString
+      - key: NODE_ENV
+        value: production
