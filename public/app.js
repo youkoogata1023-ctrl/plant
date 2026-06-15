@@ -1720,3 +1720,21 @@ function closeFlyerImageModal() {
   await fetchPlan();
   showTab("today");
 })();
+
+/* ============ Global Modal Observer ============ */
+const observer = new MutationObserver((mutations) => {
+  let isAnyModalOpen = false;
+  document.querySelectorAll('.modal').forEach(m => {
+    if (m.style.display === 'block' || m.style.display === 'flex') isAnyModalOpen = true;
+  });
+  if (isAnyModalOpen) {
+    document.body.classList.add('modal-open');
+  } else {
+    document.body.classList.remove('modal-open');
+  }
+});
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.modal').forEach(m => {
+    observer.observe(m, { attributes: true, attributeFilter: ['style'] });
+  });
+});
