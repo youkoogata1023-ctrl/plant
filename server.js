@@ -7,13 +7,59 @@ const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const vm = require("vm");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const pool = require("./db/pool");
 const { seedDishes } = require("./db/seed");
 
 const app = express();
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "dummy");
 const PORT = process.env.PORT || 3000;
+
+async function callOpenRouterFree(prompt, systemPrompt = null) {
+  const apiKey = process.env.OPENROUTER_API_KEY || "sk-or-v1-dummy";
+  const messages = [];
+  if (systemPrompt) messages.push({ role: "system", content: systemPrompt });
+  messages.push({ role: "user", content: prompt });
+
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "openrouter/free",
+      messages
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`OpenRouter API Error: ${await response.text()}`);
+  }
+
+  const data = await response.json();
+  let text = data.choices[0].message.content.trim();
+  if (text.startsWith("```")) {
+    text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+  }
+  return text;
+}
+
+async function callOpenRouterChat(messages) {
+  const apiKey = process.env.OPENROUTER_API_KEY || "sk-or-v1-dummy";
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "openrouter/free",
+      messages
+    })
+  });
+  if (!response.ok) throw new Error(`OpenRouter API Error: ${await response.text()}`);
+  const data = await response.json();
+  return data.choices[0].message.content.trim();
+}
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -77,8 +123,6 @@ app.post("/api/dishes/import-text", wrap(async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: "Text is required" });
 
-  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "sk-or-v1-dummy";
-
   const systemPrompt = `あなたはプロの料理研究家兼データエンジニアです。
 ユーザーから提供されるテキストは、レシピサイトのページ内容をコピーしたものです。不要な情報（広告、メニュー、フッターなど）が含まれています。
 このテキストから料理レシピの情報を正確に抽出し、以下のJSONフォーマットのみを返してください。マークダウンのバッククォート(\`\`\`json)などは不要です。純粋なJSON文字列のみを出力してください。必ず日本語で出力してください。
@@ -100,33 +144,7 @@ app.post("/api/dishes/import-text", wrap(async (req, res) => {
 - steps（作り方）から、料理と無関係な「ボタンを押す」「探す」といったサイト特有の操作テキストは除外してください。`;
 
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "openrouter/free",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: text }
-        ]
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenRouter API Error (${response.status}): ${errorText}`);
-    }
-
-    const data = await response.json();
-    let jsonStr = data.choices[0].message.content.trim();
-    
-    // Markdownブロックの除去をより堅牢に
-    if (jsonStr.startsWith("```")) {
-      jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
-    }
+    const jsonStr = await callOpenRouterFree(text, systemPrompt);
     
     let parsed;
     try {
@@ -218,8 +236,8 @@ app.delete("/api/dishes/:id", wrap(async (req, res) => {
 // 1. AI献立提案 (既存の料理リストから最適な7つを選ぶ)
 app.post("/api/generate-ai", wrap(async (req, res) => {
   const { query, season, budget, minProtein } = req.body;
-  if (!process.env.GEMINI_API_KEY) {
-    return res.status(400).json({ error: "no_api_key", message: "環境変数 GEMINI_API_KEY が設定されていません。" });
+  if (!process.env.OPENROUTER_API_KEY) {
+    return res.status(400).json({ error: "no_api_key", message: "環境変数 OPENROUTER_API_KEY が設定されていません。" });
   }
 
   const { rows } = await pool.query("SELECT id, name, main_protein, kcal, cost, seasons, meal_type FROM dishes");
@@ -240,12 +258,9 @@ ${rows.map(r => `ID:${r.id} | ${r.name} (種類:${r.meal_type.join(',')}, ${r.kc
   ]
 }`;
 
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
   let parsed;
   try {
-    const result = await model.generateContent(prompt);
-    let text = result.response.text();
-    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    const text = await callOpenRouterFree(prompt);
     parsed = JSON.parse(text);
     if (!parsed.days || parsed.days.length !== 7) throw new Error("Invalid AI response");
   } catch (err) {
@@ -295,21 +310,19 @@ ${rows.map(r => `ID:${r.id} | ${r.name} (種類:${r.meal_type.join(',')}, ${r.kc
   res.json({ message: parsed.message, weekMenu });
 }));
 
-// 2. AIレシピ考案 (全く新しいレシピを生成)
-app.post("/api/generate-recipe", wrap(async (req, res) => {
-  const { query } = req.body;
-  if (!process.env.GEMINI_API_KEY) {
-    return res.status(400).json({ error: "no_api_key", message: "GEMINI_API_KEY を設定してください" });
-  }
+// 2. AIチャット（たくみ：レシピ考案）
+app.post("/api/chat/takumi", wrap(async (req, res) => {
+  const { messages } = req.body;
+  if (!process.env.OPENROUTER_API_KEY) return res.json({ replyText: "APIキーがないためレシピ考案できません。" });
 
-  const prompt = `あなたはプロの料理研究家です。ユーザーの要望に合わせて新しい実用的なレシピを1つ考案し、JSONで返してください。
-【ユーザーの要望】: ${query}
-
-出力形式は以下のJSONのみにしてください。マークダウンや説明は不要です。
+  const systemMsg = `あなたはプロのAIシェフ「たくみ」です。
+ユーザーと対話して要望を引き出し、新しいオリジナルレシピを考案します。
+レシピを考案したと判断した場合は、必ず返答の最後に以下の形式のJSONブロックを含めてください。
+\`\`\`json
 {
   "name": "料理名",
-  "season": ["spring", "summer", "autumn", "winter"] の中から合うものを1〜複数,
-  "mainProtein": "主なタンパク源となる食材名（例：鶏もも肉）",
+  "season": ["spring", "summer", "autumn", "winter"] から1〜複数,
+  "mainProtein": "主なタンパク源となる食材名",
   "prepTime": 調理時間(分, 数値),
   "protein": タンパク質(g, 数値),
   "carbs": 炭水化物(g, 数値),
@@ -318,60 +331,48 @@ app.post("/api/generate-recipe", wrap(async (req, res) => {
   "cost": 1人分の材料費(円, 数値),
   "ingredients": ["材料1 分量", "材料2 分量"],
   "steps": ["手順1", "手順2"],
-  "mealType": ["breakfast", "lunch", "dinner"] のうち合うものを1〜複数
-}`;
+  "mealType": ["breakfast", "lunch", "dinner"] から1〜複数
+}
+\`\`\`
+レシピを考案していない雑談の段階ではJSONブロックを含めないでください。`;
 
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-  let recipe;
+  const chatMessages = [{ role: "system", content: systemMsg }, ...messages];
   try {
-    const result = await model.generateContent(prompt);
-    let text = result.response.text();
-    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    recipe = JSON.parse(text);
+    const text = await callOpenRouterChat(chatMessages);
+    
+    // JSON抽出ロジック
+    let replyText = text;
+    let recipeObj = null;
+    const jsonMatch = text.match(/```(?:json)?\s*([\\s\\S]*?)\s*```/i);
+    if (jsonMatch) {
+      try {
+        recipeObj = JSON.parse(jsonMatch[1].trim());
+        replyText = text.replace(jsonMatch[0], "").trim();
+      } catch(e) {}
+    }
+
+    res.json({ replyText, recipeObj });
   } catch (err) {
-    console.error("AI API Error, falling back to mock:", err.message);
-    recipe = {
-      name: "【モック】特製AIチャーハン",
-      season: ["spring", "summer", "autumn", "winter"],
-      mainProtein: "卵と豚肉",
-      prepTime: 10,
-      protein: 20,
-      carbs: 50,
-      fat: 15,
-      kcal: 550,
-      cost: 200,
-      ingredients: ["ご飯 200g", "卵 1個", "豚こま肉 50g", "ネギ 1/4本", "醤油 大さじ1", "塩こしょう 少々", "ごま油 大さじ1"],
-      steps: ["豚肉とネギを細かく切る", "フライパンにごま油を熱し、豚肉を炒める", "溶き卵とご飯を加えてパラパラになるまで炒める", "ネギを加え、醤油と塩こしょうで味を調える"],
-      mealType: ["lunch", "dinner"]
-    };
+    res.json({ replyText: "ごめん、ちょっと調子が悪いみたい。もう一度言ってくれる？" });
   }
-  
-  res.json(recipe);
 }));
 
-// 3. AI買い物アドバイス
-app.post("/api/shopping-advice", wrap(async (req, res) => {
-  const { items } = req.body; // ["豚肉 300g", "白菜 1/2玉", ...]
-  if (!process.env.GEMINI_API_KEY) return res.json({ advice: "APIキーがないためアドバイスを省略しました。" });
+// 3. AIチャット（ひまり：買い物アドバイス等）
+app.post("/api/chat/himari", wrap(async (req, res) => {
+  const { messages, items } = req.body;
+  if (!process.env.OPENROUTER_API_KEY) return res.json({ reply: "APIキーがないためアドバイスできません。" });
 
-  const prompt = `あなたは親しみやすく優秀なAI管理栄養士「ひまり」です。
-以下の買い物リストを分析して、節約テクニック、食材の長期保存方法、栄養バランスを高める組み合わせなど、実用的なアドバイスを3つ、優しくアドバイスする口調（「〜ですよ」「〜しましょうね！」など）で、箇条書きで教えてください。
-【買い物リスト】
-${items.join('\n')}
+  const systemMsg = `あなたは親しみやすく優秀なAI管理栄養士「ひまり」です。
+ユーザーの質問や、買い物リストに対して優しくアドバイスする口調（「〜ですよ」「〜しましょうね！」など）で答えてください。
+現在の買い物リスト:
+${(items && items.length > 0) ? items.join(", ") : "なし"}`;
 
-出力形式（各項目の先頭は「・」にしてください）：
-・アドバイス1
-・アドバイス2
-・アドバイス3`;
-
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const chatMessages = [{ role: "system", content: systemMsg }, ...messages];
   try {
-    const result = await model.generateContent(prompt);
-    res.json({ advice: result.response.text() });
+    const text = await callOpenRouterChat(chatMessages);
+    res.json({ reply: text });
   } catch (err) {
-    console.error("AI API Error, falling back to mock:", err.message);
-    const mockAdvice = "・【制限モード】現在AI APIが制限に達していますが、お肉は小分けにして冷凍保存すると便利ですよ！\n・野菜は水分をよく拭き取ってから保存すると長持ちします。\n・この食材なら、週末にまとめて作り置きをするのがおすすめです！";
-    res.json({ advice: mockAdvice });
+    res.json({ reply: "ごめんね、いまちょっと考えられないみたい。後でもう一度試してね！" });
   }
 }));
 

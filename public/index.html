@@ -14,6 +14,7 @@
   <!-- Three.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <link rel="stylesheet" href="/index.css?v=3" />
+  <link rel="stylesheet" href="/chat.css" />
 </head>
 <body>
   <!-- Theme Toggle -->
@@ -181,16 +182,28 @@
         </div>
       </header>
 
-      <!-- ひまりの買い物アドバイスボード -->
-      <div class="advisor-container" id="shopping-advisor-container" style="margin-bottom: 1.5rem;">
-        <div class="advisor-avatar-box" id="himari-shopping-3d-container">
-          <!-- 3D Canvas will be injected here -->
-        </div>
-        <div class="advisor-info">
-          <div class="advisor-name">ひまり <span>AI管理栄養士</span></div>
-          <div class="speech-bubble" id="shopping-advisor-speech">
-            献立を作成したら「買い物アドバイス」ボタンを押してね。食材の賢い保存法や節約術を教えるよ！
+      <!-- ひまりのチャットUI -->
+      <div class="advisor-chat-container" id="shopping-chat-container" style="margin-bottom: 1.5rem; background: var(--card-bg); backdrop-filter: blur(10px); border-radius: var(--border-radius); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); overflow: hidden; display: flex; flex-direction: column;">
+        <div class="advisor-chat-header" style="display: flex; align-items: center; gap: 0.8rem; padding: 1rem 1.25rem; border-bottom: 1px solid rgba(226, 232, 240, 0.4); background: rgba(255, 107, 74, 0.05);">
+          <div class="advisor-avatar-box-small" id="himari-shopping-3d-container" style="width: 45px; height: 45px; border-radius: 50%; background: #FFECE8; border: 2px solid #FF6B4A; overflow: hidden; display:flex; justify-content:center; align-items:flex-end;">
+            <!-- 3D Canvas will be injected here -->
           </div>
+          <div class="advisor-name" style="font-weight: 700; color: var(--primary-color);">ひまり <span style="font-size: 0.75rem; color: var(--text-light); font-weight: 400; margin-left: 0.3rem;">AI管理栄養士</span></div>
+        </div>
+        
+        <div class="chat-messages" id="shopping-chat-messages" style="padding: 1rem; overflow-y: auto; max-height: 300px; display: flex; flex-direction: column; gap: 1rem; background: var(--bg-color);">
+          <div class="chat-message ai" style="display: flex; gap: 0.5rem; align-items: flex-end;">
+            <div class="chat-bubble" style="background: var(--primary-light); color: var(--text-main); padding: 0.75rem 1rem; border-radius: 16px; border-bottom-left-radius: 4px; font-size: 0.9rem; max-width: 85%; border: 1px solid rgba(255,107,74,0.2);">
+              献立を作成したら「買い物アドバイス」ボタンを押してね。食材の賢い保存法や節約術を教えるよ！何でも聞いてね！
+            </div>
+          </div>
+        </div>
+        
+        <div class="chat-input-area" style="padding: 1rem; border-top: 1px solid var(--border-color); display: flex; gap: 0.5rem; background: var(--card-bg);">
+          <input type="text" id="shopping-chat-input" placeholder="ひまりにメッセージを送る..." onkeypress="handleShoppingChatKey(event)" style="flex-grow: 1; padding: 0.6rem 1rem; border-radius: 20px; border: 1px solid var(--border-color); background: var(--input-bg); font-family: inherit; font-size: 0.9rem;" />
+          <button class="btn btn-primary" onclick="sendShoppingChat()" style="border-radius: 20px; padding: 0.6rem 1rem; min-height: unset;">
+            <i class="ph ph-paper-plane-right"></i>
+          </button>
         </div>
       </div>
 
@@ -335,24 +348,29 @@
       <span class="close" onclick="closeAiRecipeModal()">&times;</span>
       <h3><i class="ph ph-magic-wand"></i> AI レシピ考案</h3>
       
-      <!-- たくみの案内スペース -->
-      <div class="advisor-container" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, rgba(254, 243, 199, 0.85) 0%, rgba(253, 230, 138, 0.85) 100%); border-color: rgba(251, 191, 36, 0.4);">
-        <div class="advisor-avatar-box" id="takumi-3d-container" style="border-color: #FBBF24;">
-          <!-- 3D Canvas will be injected here -->
+      <!-- たくみのチャットスペース -->
+      <div class="advisor-chat-container takumi-chat" style="margin-bottom: 1.5rem; background: var(--card-bg); backdrop-filter: blur(10px); border-radius: var(--border-radius); border: 1px solid rgba(251, 191, 36, 0.4); box-shadow: var(--shadow-sm); overflow: hidden; display: flex; flex-direction: column;">
+        <div class="advisor-chat-header" style="display: flex; align-items: center; gap: 0.8rem; padding: 1rem 1.25rem; border-bottom: 1px solid rgba(251, 191, 36, 0.2); background: linear-gradient(135deg, rgba(254, 243, 199, 0.5) 0%, rgba(253, 230, 138, 0.5) 100%);">
+          <div class="advisor-avatar-box-small" id="takumi-3d-container" style="width: 45px; height: 45px; border-radius: 50%; background: #FEF3C7; border: 2px solid #FBBF24; overflow: hidden; display:flex; justify-content:center; align-items:flex-end;">
+            <!-- 3D Canvas will be injected here -->
+          </div>
+          <div class="advisor-name" style="font-weight: 700; color: #D97706;">たくみ <span style="font-size: 0.75rem; color: var(--text-light); font-weight: 400; margin-left: 0.3rem;">AIシェフ</span></div>
         </div>
-        <div class="advisor-info">
-          <div class="advisor-name" style="color: #D97706;">たくみ <span>AIシェフ</span></div>
-          <div class="speech-bubble" id="ai-recipe-speech" style="border-color: rgba(251, 191, 36, 0.2);">
-            こんにちは！冷蔵庫の余り物や、今食べたい気分の食材を入力してね。僕が新しいオリジナルレシピを考案するよ！
+        
+        <div class="chat-messages" id="takumi-chat-messages" style="padding: 1rem; overflow-y: auto; max-height: 350px; display: flex; flex-direction: column; gap: 1rem; background: var(--bg-color);">
+          <div class="chat-message ai" style="display: flex; gap: 0.5rem; align-items: flex-end;">
+            <div class="chat-bubble takumi-bubble" style="background: #FEF3C7; color: var(--text-main); padding: 0.75rem 1rem; border-radius: 16px; border-bottom-left-radius: 4px; font-size: 0.9rem; max-width: 85%; border: 1px solid rgba(251, 191, 36, 0.3);">
+              こんにちは！冷蔵庫の余り物や、今食べたい気分の食材を教えてね。僕が新しいオリジナルレシピを考案するよ！
+            </div>
           </div>
         </div>
-      </div>
-
-      <input type="text" id="ai-recipe-query" placeholder="例: 大根と豚肉で辛いもの" />
-      <button class="btn btn-primary" onclick="generateAiRecipe()" id="ai-recipe-btn" style="width:100%; justify-content:center;">考案する</button>
-      <div id="ai-recipe-loading" class="hidden" style="margin-top:1rem; color:var(--text-light); text-align:center;">
-        <i class="ph ph-spinner ph-spin" style="font-size:2rem; margin-bottom:0.5rem; color:var(--primary-color)"></i>
-        <p>レシピを考案中です...</p>
+        
+        <div class="chat-input-area" style="padding: 1rem; border-top: 1px solid var(--border-color); display: flex; gap: 0.5rem; background: var(--card-bg);">
+          <input type="text" id="ai-recipe-query" placeholder="例: 大根と豚肉で辛いもの" onkeypress="handleTakumiChatKey(event)" style="flex-grow: 1; padding: 0.6rem 1rem; border-radius: 20px; border: 1px solid var(--border-color); background: var(--input-bg); font-family: inherit; font-size: 0.9rem;" />
+          <button class="btn btn-primary" onclick="sendTakumiChat()" id="ai-recipe-btn" style="border-radius: 20px; padding: 0.6rem 1.2rem; min-height: unset; background: linear-gradient(135deg, #F59E0B, #D97706);">
+            <i class="ph ph-paper-plane-right"></i> 送信
+          </button>
+        </div>
       </div>
     </div>
   </div>

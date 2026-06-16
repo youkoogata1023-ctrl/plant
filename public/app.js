@@ -16,7 +16,9 @@ const state = {
   })),
   monthlyMenu: {},
   level: parseInt(localStorage.getItem('shunkondate_level') || '1'),
-  exp: parseInt(localStorage.getItem('shunkondate_exp') || '0')
+  exp: parseInt(localStorage.getItem('shunkondate_exp') || '0'),
+  chatHistoryHimari: JSON.parse(localStorage.getItem('shunkondate_chat_himari') || '[]'),
+  chatHistoryTakumi: JSON.parse(localStorage.getItem('shunkondate_chat_takumi') || '[]')
 };
 
 /* ============ Utility: Debounce ============ */
@@ -143,6 +145,28 @@ async function fetchPlan() {
       if (typeof parsed === 'string') parsed = JSON.parse(parsed);
       state.monthlyMenu = parsed;
     }
+  }
+  syncPlanWithDishes();
+}
+
+function syncPlanWithDishes() {
+  if (!state.monthlyMenu) return;
+  let updated = false;
+  for (const dateStr in state.monthlyMenu) {
+    const dayMenu = state.monthlyMenu[dateStr];
+    mealTypes.forEach(mt => {
+      const dish = dayMenu[mt.key];
+      if (dish && dish.id) {
+        const latestDish = state.dishes.find(d => d.id === dish.id);
+        if (latestDish) {
+          dayMenu[mt.key] = latestDish;
+          updated = true;
+        }
+      }
+    });
+  }
+  if (updated) {
+    localStorage.setItem('shunkondate_monthly_cache', JSON.stringify(state.monthlyMenu));
   }
 }
 
@@ -1265,41 +1289,71 @@ function uncheckAllShopping() {
   showToast('チェックをすべて解除しました', 'info');
 }
 
+function handleShoppingChatKey(e) {
+  if (e.key === "Enter") sendShoppingChat();
+}
+
+function renderShoppingChat() {
+  const container = document.getElementById("shopping-chat-messages");
+  if (!container) return;
+  const intro = `<div class="chat-message ai"><div class="chat-bubble" style="background: var(--primary-light); color: var(--text-main); padding: 0.75rem 1rem; border-radius: 16px; border-bottom-left-radius: 4px; font-size: 0.9rem; max-width: 85%; border: 1px solid rgba(255,107,74,0.2);">献立を作成したら「買い物アドバイス」ボタンを押してね。食材の賢い保存法や節約術を教えるよ！何でも聞いてね！</div></div>`;
+  
+  let html = intro;
+  state.chatHistoryHimari.forEach(msg => {
+    if (msg.role === "user") {
+      html += `<div class="chat-message user"><div class="chat-bubble">${msg.content}</div></div>`;
+    } else {
+      const text = msg.content.replace(/\n/g, "<br>");
+      html += `<div class="chat-message ai"><div class="chat-bubble" style="background: var(--primary-light); color: var(--text-main); padding: 0.75rem 1rem; border-radius: 16px; border-bottom-left-radius: 4px; font-size: 0.9rem; max-width: 85%; border: 1px solid rgba(255,107,74,0.2);">${text}</div></div>`;
+    }
+  });
+  container.innerHTML = html;
+  container.scrollTop = container.scrollHeight;
+}
+
+// 既存のボタンからのアドバイス呼び出しにも対応するため
 async function getShoppingAdvice() {
-  const btn = document.querySelector("#tab-shopping .btn-primary");
-  const org = btn.innerHTML;
-  btn.innerHTML = `<i class="ph ph-spinner ph-spin"></i> 考え中...`;
-  btn.disabled = true;
-
-  const speechEl = document.getElementById("shopping-advisor-speech");
-  if (speechEl) {
-    speechEl.innerHTML = `<div class="character-typing-loader"><span></span><span></span><span></span></div>ひまりが考え中...`;
-  }
-
   const items = Array.from(document.querySelectorAll('.ingredient-item label')).map(l => l.innerText);
+  if (items.length === 0) return showToast("買い物リストが空です", "info");
+  const msg = "この買い物リストに対するアドバイスを教えて！\\n" + items.join(", ");
+  await doSendShoppingChat(msg);
+}
+
+async function sendShoppingChat() {
+  const input = document.getElementById("shopping-chat-input");
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = "";
+  await doSendShoppingChat(msg);
+}
+
+async function doSendShoppingChat(msg) {
+  const items = Array.from(document.querySelectorAll('.ingredient-item label')).map(l => l.innerText);
+  
+  state.chatHistoryHimari.push({ role: "user", content: msg });
+  localStorage.setItem('shunkondate_chat_himari', JSON.stringify(state.chatHistoryHimari));
+  renderShoppingChat();
+
+  const container = document.getElementById("shopping-chat-messages");
+  container.innerHTML += `<div class="chat-message ai" id="himari-typing"><div class="chat-bubble" style="background: var(--primary-light);"><div class="typing-indicator"><span></span><span></span><span></span></div></div></div>`;
+  container.scrollTop = container.scrollHeight;
+
   try {
-    const res = await fetch("/api/shopping-advice", {
+    const res = await fetch("/api/chat/himari", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items })
+      body: JSON.stringify({ messages: state.chatHistoryHimari, items })
     });
     const data = await res.json();
-    if (data.error) {
-      if (speechEl) speechEl.innerText = "アドバイスの取得に失敗しました: " + data.message;
-    } else {
-      const text = data.advice.replace(/\n/g, "<br>").replace(/・/g, "✨ ");
-      if (speechEl) {
-        speechEl.innerHTML = `<b>ひまりからの買い物アドバイス（${state.servings}人分・選択曜日の集計）：</b><br>${text}`;
-      }
-      showToast('買い物アドバイスを受け取りました！', 'success');
-    }
+    if (data.error) throw new Error(data.message);
+
+    state.chatHistoryHimari.push({ role: "assistant", content: data.reply });
+    localStorage.setItem('shunkondate_chat_himari', JSON.stringify(state.chatHistoryHimari));
   } catch (e) {
-    if (speechEl) speechEl.innerText = "エラーが発生しました。インターネット接続を確認してください。";
-    showToast('アドバイスの取得に失敗しました', 'error');
-  } finally {
-    btn.innerHTML = org;
-    btn.disabled = false;
+    showToast('エラーが発生しました', 'error');
+    state.chatHistoryHimari.push({ role: "assistant", content: "ごめんね、エラーが発生しちゃったみたい。もう一度送ってみてね！" });
   }
+  renderShoppingChat();
 }
 
 async function findSupermarkets() {
@@ -1384,49 +1438,95 @@ async function generateAiMenu() {
 
 function openGenerateRecipeModal() { document.getElementById("ai-recipe-modal").style.display = "block"; }
 
-async function generateAiRecipe() {
-  const query = document.getElementById("ai-recipe-query").value;
-  if (!query) return;
-  const btn = document.getElementById("ai-recipe-btn");
-  const loading = document.getElementById("ai-recipe-loading");
-  const speechEl = document.getElementById("ai-recipe-speech");
+function handleTakumiChatKey(e) {
+  if (e.key === "Enter") sendTakumiChat();
+}
 
-  btn.disabled = true;
-  loading.classList.remove("hidden");
-  if (speechEl) speechEl.innerHTML = "ふむむ、美味しいオリジナルレシピを考えているよ！ちょっと待っててね。🍳";
+function renderTakumiChat() {
+  const container = document.getElementById("takumi-chat-messages");
+  if (!container) return;
+  const intro = `<div class="chat-message ai"><div class="chat-bubble takumi-bubble" style="background: #FEF3C7; color: var(--text-main); padding: 0.75rem 1rem; border-radius: 16px; border-bottom-left-radius: 4px; font-size: 0.9rem; max-width: 85%; border: 1px solid rgba(251, 191, 36, 0.3);">こんにちは！冷蔵庫の余り物や、今食べたい気分の食材を教えてね。僕が新しいオリジナルレシピを考案するよ！</div></div>`;
+  
+  let html = intro;
+  state.chatHistoryTakumi.forEach((msg, idx) => {
+    if (msg.role === "user") {
+      html += `<div class="chat-message user"><div class="chat-bubble" style="background:#D97706;">${msg.content}</div></div>`;
+    } else {
+      let contentHtml = msg.content;
+      // Recipe JSONブロックが存在するか判定
+      if (msg.recipeObj) {
+        contentHtml += `
+          <div class="chat-recipe-card">
+            <h4>${msg.recipeObj.name}</h4>
+            <div class="recipe-meta">
+              <span><i class="ph ph-fire"></i> ${msg.recipeObj.kcal}kcal</span>
+              <span><i class="ph ph-clock"></i> ${msg.recipeObj.prepTime}分</span>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="saveTakumiRecipe(${idx})" style="width:100%; justify-content:center; margin-top:0.5rem; background:linear-gradient(135deg, #F59E0B, #D97706);"><i class="ph ph-book-bookmark"></i> カタログに保存</button>
+          </div>
+        `;
+      }
+      contentHtml = contentHtml.replace(/\n/g, "<br>");
+      html += `<div class="chat-message ai"><div class="chat-bubble takumi-bubble" style="background: #FEF3C7; color: var(--text-main); padding: 0.75rem 1rem; border-radius: 16px; border-bottom-left-radius: 4px; font-size: 0.9rem; max-width: 85%; border: 1px solid rgba(251, 191, 36, 0.3);">${contentHtml}</div></div>`;
+    }
+  });
+  container.innerHTML = html;
+  container.scrollTop = container.scrollHeight;
+}
+
+async function sendTakumiChat() {
+  const input = document.getElementById("ai-recipe-query");
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = "";
+  
+  state.chatHistoryTakumi.push({ role: "user", content: msg });
+  localStorage.setItem('shunkondate_chat_takumi', JSON.stringify(state.chatHistoryTakumi));
+  renderTakumiChat();
+
+  const container = document.getElementById("takumi-chat-messages");
+  container.innerHTML += `<div class="chat-message ai" id="takumi-typing"><div class="chat-bubble takumi-bubble" style="background: #FEF3C7;"><div class="typing-indicator"><span></span><span></span><span></span></div></div></div>`;
+  container.scrollTop = container.scrollHeight;
 
   try {
-    const r = await fetch("/api/generate-recipe", {
+    const res = await fetch("/api/chat/takumi", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query })
+      body: JSON.stringify({ messages: state.chatHistoryTakumi })
     });
-    const data = await r.json();
+    const data = await res.json();
     if (data.error) throw new Error(data.message);
 
+    // テキスト部分とレシピJSONを分離して保存する
+    state.chatHistoryTakumi.push({ role: "assistant", content: data.replyText, recipeObj: data.recipeObj });
+    localStorage.setItem('shunkondate_chat_takumi', JSON.stringify(state.chatHistoryTakumi));
+  } catch (e) {
+    showToast('エラーが発生しました', 'error');
+    state.chatHistoryTakumi.push({ role: "assistant", content: "ごめんね、うまくレシピを考えられなかったよ。もう一度試してみて！" });
+  }
+  renderTakumiChat();
+}
+
+async function saveTakumiRecipe(msgIdx) {
+  const msg = state.chatHistoryTakumi[msgIdx];
+  if (!msg || !msg.recipeObj) return;
+  try {
     const saveRes = await fetch("/api/dishes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data)
+      body: JSON.stringify(msg.recipeObj)
     });
     if (!saveRes.ok) throw new Error("レシピの保存に失敗しました");
 
     await fetchDishes();
-    if (speechEl) {
-      speechEl.innerHTML = `できたよ！新しいレシピ<b>「${data.name}」</b>を考案してカタログに登録したよ！さっそく献立プランナーで使ってみてね！🌟`;
-    }
-    document.getElementById("ai-recipe-query").value = "";
-    showToast(`新レシピ「${data.name}」を登録しました！`, 'success');
-    setTimeout(() => {
-      closeAiRecipeModal();
-      renderCatalog();
-    }, 3000);
-  } catch (e) {
+    showToast(`新レシピ「${msg.recipeObj.name}」を登録しました！`, 'success');
+    msg.content += "\\n\\n**(このレシピはカタログに保存されました)**";
+    msg.recipeObj = null; // ボタンを消す
+    localStorage.setItem('shunkondate_chat_takumi', JSON.stringify(state.chatHistoryTakumi));
+    renderTakumiChat();
+    renderCatalog();
+  } catch(e) {
     showToast("エラー: " + e.message, 'error');
-    if (speechEl) speechEl.innerHTML = "ごめんね、うまくレシピを考えられなかったよ。もう一度試してみて！";
-  } finally {
-    btn.disabled = false;
-    loading.classList.add("hidden");
   }
 }
 
@@ -1620,7 +1720,11 @@ async function saveDish(e) {
     await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     closeDishModal();
     await fetchDishes();
+    syncPlanWithDishes();
     renderCatalog();
+    if (document.getElementById('tab-month').classList.contains('active')) renderMonth();
+    if (document.getElementById('tab-week').classList.contains('active')) renderWeek();
+    if (document.getElementById('tab-today').classList.contains('active')) renderToday();
     showToast(id ? '料理を更新しました' : '新しい料理を登録しました', 'success');
   } catch(e) {
     showToast('保存に失敗しました', 'error');
@@ -1757,6 +1861,9 @@ function closeFlyerImageModal() {
   syncShoppingUI();
   await fetchDishes();
   await fetchPlan();
+  syncPlanWithDishes();
+  renderShoppingChat();
+  renderTakumiChat();
   showTab("today");
 })();
 
